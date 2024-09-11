@@ -1,0 +1,17 @@
+-Create wordlists for all type:
+    -backup: db backup + common backup files -> merge several wordlists (by distinc)
+    -config: php config files + api config files ?
+    -hidden: all files starting by '.'
+    -common: default wordlist either using big or using common.txt
+
+-perform enumeration according to a type (the right wordlist and the right extension)
+    -if extension is missing (very unlikely)
+
+
+-perform enumeration authenticated:
+    -cookie
+    -header
+
+-code
+    -Display number of results with the time passed
+  
