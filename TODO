@@ -8,10 +8,4 @@
     -if extension is missing (very unlikely)
 
 
--perform enumeration authenticated:
-    -cookie
-    -header
-
--code
-    -Display number of results with the time passed
   

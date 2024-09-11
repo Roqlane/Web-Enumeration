@@ -3,6 +3,7 @@ import argparse
 import time
 import aiohttp
 import asyncio
+import math
 
 RED = "\33[91m"
 BLUE = "\33[94m"
@@ -18,8 +19,7 @@ def banner():
     font = f"""{BLUE}
 ---------
 WebEnum 
----------{END}                                                                                                                                                                             
-    """
+---------{END}"""
     print(font)
 
 def getWordlistsJson(path):
@@ -52,7 +52,7 @@ def getConfigWordlists(data):
 def getUrl(url):
     finalUrl = ""
     if "http" not in url and "https" not in url:
-        finalUrl = "https://" + url
+        finalUrl = "http://" + url
     else:
         finalUrl = url
         
@@ -63,51 +63,48 @@ def getUrl(url):
     
 def displayState(current, length):
     #print the progress of the enumeration
-    state = (current * 100) // length
+    state = math.ceil((current*100) / length)
     if (state != 0 and state % 10 == 0):
-        print(f"{state}%", end="\r", flush=True)
+        if (state == 100):
+            print(f"Launching search...", end="\r", flush=True)
+        else:
+            print(f"{state}%", end="\r", flush=True)
         
-async def is_host_online(url):
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.head(url) as resp:
-                if 200 <= resp.status < 400:
-                    return True
-                else:
-                    print(f"{RED}[-] Host {url} is offline. Status: {resp.status}{END}")
-                    return False
-                
-    except aiohttp.ClientError as e:
-        print(f"{RED}[-] Host {url} is unreachable. Error: {e}{END}")
-        return False
 
-async def requestUrl(session, url, statusCode, current, length):
+async def requestUrl(session, url, current, length):
+    global results, statusCode
     url = url.replace('\n', '')
     try:
+        displayState(current, length)
         async with session.get(url) as resp:
-            displayState(current, length)
-                
             if str(resp.status) in statusCode:
-                print(f"{GREEN}[+] Found : {url}\tCode : {resp.status}{END}")
+                print(f"{GREEN}[+] Found : {url.ljust(50)}Code : {resp.status}{END}")
+                results.append((url,resp.status))
     except aiohttp.ClientError:
         print(f"{RED}[-] Failed : {url}{END}")
 
-async def search(url, path, extensions, statusCode):
+async def search(url, path):
+    global headers, cookies, extensions, statusCode
     data = getWordlist(path)
     url = getUrl(url)
     urls = [url + endpoint + ext for endpoint in data for ext in extensions]
     urlsLength = len(urls)
     
-    async with aiohttp.ClientSession() as session:
-        tasks = [requestUrl(session, u, statusCode,i, urlsLength) for (i,u) in enumerate(urls)]
+    async with aiohttp.ClientSession(headers=headers, cookies=cookies) as session:
+        tasks = [requestUrl(session, u, i, urlsLength) for (i,u) in enumerate(urls)]
         await asyncio.gather(*tasks)
         
-def run_search(url, path, extensions, statusCode):
-    asyncio.run(search(url, path, extensions, statusCode))
+def run_search(url, path):
+    asyncio.run(search(url, path))
     
 def main(args):
+    global headers, cookies, extensions, statusCode
     wordlists = args.wordlists
     enumType = None
+    extensions = args.extensions
+    statusCode = args.status_codes
+    cookies = args.cookies
+    headers = args.headers
     if args.wordlists == None:
         enumType = args.type
         if enumType == "all":
@@ -118,11 +115,12 @@ def main(args):
     
     for w in wordlists:
         print("Enumerating " + w)
-        run_search(args.url, w, args.extensions, args.status_codes)
+        run_search(args.url, w)
     
             
 if __name__ == "__main__":
     banner()
+    start = time.time()    
     config = getWordlistsJson("config.json")
     
     parser = argparse.ArgumentParser(description="Enum a webpage asynchronously with the different wordlists either entered or using the premade config files")
@@ -130,15 +128,14 @@ if __name__ == "__main__":
     parser.add_argument("-w", "--wordlists", nargs='+', help="You can enter one or several wordlists that will be used for the enumeration")
     parser.add_argument("-type", choices=["backup", "config", "hidden", "common", "all"], help="If no wordlists were entered, you could chose which type of file to search (backup, config, hidden, common, all) (default: all)", default="all")
     parser.add_argument("-x", "--extensions", help="The extensions that will be added to each endpoint of wordlist", nargs='+', default=[""])
-    parser.add_argument("-sc", "--status-codes", help="The status codes that will be returned (default: 200)", default=[200], nargs='+')
+    parser.add_argument("-sc", "--status-codes", help="The status codes that will be returned (default: 200)", default=['200'], nargs='+')
+    parser.add_argument("-H", "--headers", help="Headers you would like to add to the requests", type=json.loads)
+    parser.add_argument("-c", "--cookies", help="Cookies you would like to add to the requests. You must set them a dictionary ({\"key\":\"value\"})", type=json.loads)
     #parser.add_argument("-R", "--recursive", help="Search the page recursively", default=False, action='store_true')
 
     args = parser.parse_args()
     
-    start = time.time()    
-    
     main(args)
-
 
 
     #backup extension
