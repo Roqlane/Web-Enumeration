@@ -1,8 +1,8 @@
 {
     "files": {
-        "backup": "",
-        "config": "",
-        "hidden": "",
-        "common": ""
+        "backup": "wordlists/backup.txt",
+        "config": "wordlists/config.txt",
+        "hidden": "wordlists/hidden.txt",
+        "common": "wordlists/common.txt"
     }
 }

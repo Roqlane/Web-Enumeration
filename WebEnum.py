@@ -72,14 +72,13 @@ def displayState(current, length):
         
 
 async def requestUrl(session, url, current, length):
-    global results, statusCode
+    global statusCode
     url = url.replace('\n', '')
     try:
         displayState(current, length)
         async with session.get(url) as resp:
             if str(resp.status) in statusCode:
                 print(f"{GREEN}[+] Found : {url.ljust(50)}Code : {resp.status}{END}")
-                results.append((url,resp.status))
     except aiohttp.ClientError:
         print(f"{RED}[-] Failed : {url}{END}")
 
@@ -99,12 +98,14 @@ def run_search(url, path):
     
 def main(args):
     global headers, cookies, extensions, statusCode
+    
     wordlists = args.wordlists
     enumType = None
     extensions = args.extensions
     statusCode = args.status_codes
     cookies = args.cookies
     headers = args.headers
+    
     if args.wordlists == None:
         enumType = args.type
         if enumType == "all":
@@ -136,20 +137,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     main(args)
-
-
-    #backup extension
     
-    #config extension
-    
-    #type of search (backend, config, hidden, common, all) 
-    
-    #add extensions for common search
-    
-    #status code
-    
-
-
     print("\nFinished in %ss" % (time.time() - start))
 
 
