@@ -10,5 +10,8 @@ cd Web-Enumeration
 pip install -r requirements.txt
 ```
 
-## Usage
+## Example Usage
 
+`python3 WebEnum.py http://localhost:5000 -sc 200 302 403 -x .sql .php`
+
+![image](https://github.com/user-attachments/assets/31edb953-ccbd-484d-9e3c-dd20f7b271e2)
