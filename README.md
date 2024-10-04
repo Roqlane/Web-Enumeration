@@ -5,8 +5,8 @@ This tool can be used to enumerate different page of a website by using multiple
 ## Installation
 
 ```
-git clone repo
-cd repo
+git clone https://github.com/Roqlane/Web-Enumeration.git
+cd Web-Enumeration
 pip install -r requirements.txt
 ```
 
