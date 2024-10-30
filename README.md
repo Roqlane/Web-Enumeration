@@ -18,4 +18,4 @@ pip install -r requirements.txt
 
 ## Wordlists
 
-The tools comes with 4 available wordlists for enumerating backup, hidden, config or common files on website. The wordlists inside the project were made by merging wordlists that already exist and by using ChatGPT.
+The tools comes with 4 available wordlists for enumerating backup, hidden, config or common files on website. The path to these wordlists are stored in the `config.json` file. The wordlists inside the project were made by merging wordlists that already exist and by using ChatGPT.
