@@ -3,7 +3,7 @@ import argparse
 import time
 from colors import *
 from search import Search
-from wordlist import LoadWordlists
+from settings import LoadSettings
 
 
 CONFIG_PATH = "config.json"
@@ -23,44 +23,70 @@ def displayNumberOfRequests(endpoints, extensions):
         
     print(f"\nLoading {n} requests... This process can take time.\n")
     
-def getEndpoints(wordlists, loader: LoadWordlists):
+def getEndpoints(wordlists, loader: LoadSettings):
     data = []
     for w in wordlists:
-        for e in loader.getWordlist(w):
+        for e in loader.getFileData(w):
             data.append(e)
             
     return data
     
 def main(args):    
     urls_found = []
-
-    wordlistLoader = LoadWordlists(CONFIG_PATH)
-    searcher = Search()
+    settingsLoader = LoadSettings(CONFIG_PATH)
     
-    targetUrl = searcher.get_url(args.url)
+    target_url = args.url
     wordlists = args.wordlists
     enumType = None
     extensions = args.extensions
-    statusCode = args.status_codes
+    status_codes = args.status_codes
     cookies = args.cookies
     headers = args.headers
+    method = args.method
+    timeout = args.timeout
+    time_interval = args.time_interval
+    max_concurrency = args.max_concurrency
+    fuzz_mode = args.fuzz
     
-    # if no wordlists were given, take from the default ones
-    if args.wordlists == None:
+    if wordlists == None:
         enumType = args.type
-        wordlists = wordlistLoader.getConfigWordlists(enumType)
+        wordlists = settingsLoader.getConfigWordlists(enumType)
+    if status_codes == None:
+            status_codes = settingsLoader.getSettings("status_codes")
+    if extensions == None:        
+        if args.extensions_file != None:
+            extensions = settingsLoader.getFileData(args.extensions_file)
+        else:
+            extensions = settingsLoader.getSettings("extensions")
+    if cookies == None:
+        if args.cookies_file != None:
+            cookies = settingsLoader.getCookies(args.cookies_file)
+        else:
+            cookies = settingsLoader.getSettings("cookies")
+    if headers == None:
+        if args.headers_file != None:
+            headers = settingsLoader.getHeaders(args.headers_file)
+        else:
+            headers = settingsLoader.getSettings("headers")
+    if timeout == None:
+        timeout = settingsLoader.getSettings("timeout")
+    if time_interval == None:
+        time_interval = settingsLoader.getSettings("time_interval")
+    if max_concurrency == None:
+        max_concurrency = settingsLoader.getSettings("max_concurrency")
+
+    searcher = Search(target_url, method,  cookies, headers, extensions, status_codes,
+                    timeout, time_interval, max_concurrency)
         
-    endpoints = getEndpoints(wordlists, wordlistLoader)
+    endpoints = getEndpoints(wordlists, settingsLoader)
     
     print(f"Wordlists:  {', '.join(wordlists)}")
     print(f"Extension: {', '.join(extensions)}")
-    print(f"Status Codes: {', '.join(statusCode)}")
+    print(f"Status Codes: {', '.join(status_codes)}")
             
     displayNumberOfRequests(endpoints, extensions)
-    
 
-    searcher.run_search(targetUrl, endpoints,
-        headers, cookies, extensions, statusCode, urls_found)
+    searcher.run_search(endpoints, urls_found)
     
             
 if __name__ == "__main__":
@@ -69,20 +95,30 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Enum a webpage asynchronously \
                         with different wordlists")
-    parser.add_argument("url", help="Url to scan")
+    parser.add_argument("-u", "--url", help="Url to scan")
     parser.add_argument("-w", "--wordlists", nargs='+', help="You can enter a single or several \
                         wordlists that will be used for the enumeration")
-    parser.add_argument("-type", choices=["backup", "config", "hidden", "common", "custom", "all"], \
-                        help="If no wordlists were to be entered, you could chose which type of file \
-                        to search with the provided wordlists (default: all)", default="all")
     parser.add_argument("-x", "--extensions", help="The extensions that will be added to each \
-                        endpoint of wordlist", nargs='+', default=[""])
+                        endpoint of wordlist", nargs='+')
+    parser.add_argument("-xf", "--extensions-file", help="File containing extensions")
     parser.add_argument("-sc", "--status-codes", help="The status codes that will be returned \
-                        (default: 200)", default=['200'], nargs='+')
+                        (default: 200, 302)", nargs='+')
     parser.add_argument("-H", "--headers", help="Headers you would like to add to the requests. \
                         Example: {\"key1\":\"value1\", \"key2\":\"value2\"}", type=json.loads)
+    parser.add_argument("-Hf", "--headers-file", help="File containing headers (json format)")
     parser.add_argument("-c", "--cookies", help="Cookies you would like to add to the requests. \
                         Example: {\"key1\":\"value1\", \"key2\":\"value2\"}", type=json.loads)
+    parser.add_argument("-cf", "--cookies-file", help="File containing cookies (json format)")
+    parser.add_argument("-m", "--method", help="You can chose which request mode you want to use", 
+                        default="GET")
+    parser.add_argument("--type", help="If no wordlists were to be entered, you could chose which \
+                        type of file (backup, common...) to search with the provided wordlists \
+                        (default: all)", default="all")
+    parser.add_argument("--timeout", help="Stop sending requests after this long (s)", type=int)
+    parser.add_argument("--time-interval", help="Time to wait between each request (s)", type=float)
+    parser.add_argument("--max-concurrency", help="Number of simultaneous requests", type=int)
+    parser.add_argument("--fuzz", help="Fuzzing mode: This works the same than in normal mode except \
+                        you have to write \"FUZZ\" inside the url", action='store_true', default=False)
     #parser.add_argument("-R", "--recursive", help="Search the page recursively", default=False, action='store_true')
 
     args = parser.parse_args()

@@ -3,11 +3,32 @@ import asyncio
 import signal
 from colors import *
 
+
+
 class Search:
-    def __init__(self):
-        pass
+    def __init__(self, url, method, cookies, headers, extensions, status_code,
+                 timeout, time_interval, max_concurrency):
+        self.url = self.get_url(url)
+        self.method = method
+        self.cookies = cookies
+        self.headers = headers
+        self.status_code = status_code
+        self.extensions = extensions
+        self.timeout = timeout
+        self.time_interval = time_interval
+        self.max_concurrency = max_concurrency
+        
+    async def is_server_up(self, session):
+        """Sends a request with a premade session to check if the target server is up"""
+        try:
+            async with session.head(self.url, timeout=self.timeout) as response:
+                return response.status < 500
+        except Exception as e:
+            print(f"{RED}[-] Server check failed : {e}{END}")
+            return False
     
     def get_url(self, url):
+        """Makes sure the entered url is in a valid format."""
         finalUrl = ""
         if "http" not in url and "https" not in url:
             finalUrl = "http://" + url
@@ -19,38 +40,56 @@ class Search:
             
         return finalUrl
             
-    async def request_url(self, session, url, currentIndex, statusCode, urls_found):
-        url = url.replace('\n', '')
-        try:
-            async with session.get(url) as resp:                
-                if str(resp.status) in statusCode and url not in urls_found:
-                    print(f"{GREEN}[+] {currentIndex} Found : {url.ljust(50)}Code : {resp.status}{END}")
-                    urls_found.append(url)
-        except aiohttp.ClientError:
-            print(f"{RED}[-] Failed : {url}{END}")
-
-    async def search_urls(self, url, wordlist, headers, cookies, extensions, statusCode, urls_found):
-        """Adds all requests in a pool"""
-        urls = [url + endpoint + ext for endpoint in wordlist for ext in extensions]
-        
-        async with aiohttp.ClientSession(headers=headers, cookies=cookies) as session:
-            tasks = [self.request_url(session, u, i, statusCode, urls_found) for (i,u) in enumerate(urls)]
+    async def request_url(self, session, semaphore, timeout, endpoint, currentIndex, endpoints_found):
+        """Sends the request"""
+        complete_url = self.url + endpoint
+        async with semaphore:
+            await asyncio.sleep(self.time_interval)
             try:
-                await asyncio.gather(*tasks)
-            except asyncio.CancelledError:
-                print("Tasks were cancelled!")
-                raise
+                async with session.request(self.method, complete_url, timeout=timeout,
+                                           allow_redirects=False) as resp:                
+                    if str(resp.status) in self.status_code and endpoint not in endpoints_found:
+                        print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url.ljust(50)}Code : {resp.status}{END}")
+                        endpoints_found.append(endpoint)
+            except aiohttp.ClientError as e:            
+                raise RuntimeError(e)
+            except asyncio.TimeoutError as e:
+                print(f"{RED}[-] Timeout : {complete_url}{END}")
+            except Exception:
+                print(f"{RED}[-] Failed : {complete_url}{END}")
             
-    def run_search(self, url, wordlist, headers, cookies, extensions, statusCode, urls_found):
+
+    async def search_urls(self, wordlist, endpoints_found):
+        """Adds all requests in a pool"""
+        async with aiohttp.ClientSession(headers=self.headers, cookies=self.cookies) as session:
+            if await self.is_server_up(session):
+                semaphore = asyncio.Semaphore(self.max_concurrency)
+                timeout = aiohttp.ClientTimeout(total=self.timeout)
+                endpoints = [endpoint + ext for endpoint in wordlist for ext in self.extensions]
+                tasks = [self.request_url(session, semaphore, timeout, e, i, endpoints_found) for (i,e) in enumerate(endpoints)]
+                try:
+                    await asyncio.gather(*tasks)
+                except RuntimeError as e:
+                    print(f"{RED}[-] Error occurred : {e}{END}")
+                    # Cancel all pending tasks
+                    for task in asyncio.all_tasks():
+                        if not task.done():
+                            task.cancel()
+                    print("Pending tasks cancelled.")    
+                except asyncio.CancelledError:
+                    raise
+            
+    def run_search(self, wordlist, endpoints_found):
+        """Handles the enumeration. Stops if any errors"""
         loop = asyncio.get_event_loop()
         # Register the signal handler for Ctrl+C
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, lambda: self.shutdown(loop))
         
         try:
-            loop.run_until_complete(self.search_urls(url, wordlist, headers, cookies, extensions, statusCode, urls_found))
+            loop.run_until_complete(self.search_urls(wordlist, endpoints_found))
         except asyncio.CancelledError:
-            print("Process terminated")
+            print("\nProcess terminated.")
         finally:
             loop.close()
                 
