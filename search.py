@@ -53,7 +53,7 @@ class Search:
                 async with session.request(self.method, complete_url, timeout=timeout,
                                            allow_redirects=False) as resp:                
                     if str(resp.status) in self.status_code and endpoint not in endpoints_found:
-                        print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url.ljust(50)}Code : {resp.status}{END}")
+                        print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url} (Code : {resp.status}){END}")
                         endpoints_found.append(endpoint)
             except aiohttp.ClientError as e:            
                 raise RuntimeError(e)

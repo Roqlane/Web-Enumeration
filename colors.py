@@ -9,7 +9,7 @@ END = "\033[0m"
 def getColor(code):
     color = CYAN
     if code < 500:
-        color = RED
+        color = YELLOW
     if code < 400:
         color = BLUE
     if code < 300:
