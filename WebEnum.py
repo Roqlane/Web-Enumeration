@@ -37,7 +37,7 @@ def main(args):
     
     target_url = args.url
     wordlists = args.wordlists
-    enumType = None
+    enumType = args.type
     extensions = args.extensions
     status_codes = args.status_codes
     cookies = args.cookies
@@ -52,7 +52,6 @@ def main(args):
         exit("Error: FUZZ word is missing in the url.")
     
     if wordlists == None:
-        enumType = args.type
         wordlists = settingsLoader.getConfigWordlists(enumType)
     if status_codes == None:
             status_codes = settingsLoader.getSettings("status_codes")
@@ -83,6 +82,10 @@ def main(args):
         
     endpoints = getEndpoints(wordlists, settingsLoader)
     
+    print("Headers:")
+    print(headers)
+    print("Cookies:")
+    print(cookies)
     print(f"Wordlists:  {', '.join(wordlists)}")
     print(f"Extension: {', '.join(extensions)}")
     print(f"Status Codes: {', '.join(status_codes)}")

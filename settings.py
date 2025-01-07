@@ -9,8 +9,12 @@ class LoadSettings:
         try:
             with open(self.configPath, "r") as configFile:
                 data = json.loads(configFile.read())
-        except :
-            print("Error while opening the config file: " + self.configPath)
+        except FileNotFoundError as e:
+            print(e)
+        except json.JSONDecodeError as e:
+            print(e)
+        except Exception as e:
+            print("Error while opening the config file: " + self.configPath + "\n" + e)
             
         return data
     
@@ -20,10 +24,10 @@ class LoadSettings:
             for elt in self.config["wordlists"]:
                 lst.append(self.config["wordlists"][elt])
         elif enumType in self.config["wordlists"]:
-            for elt in self.config["wordlists"][enumType]:
-                lst.append(elt)
+            lst.append(self.config["wordlists"][enumType])
         else:
-            print(f"Settings \"{enumType}\" not in config file.")
+            print(f"Wordlist \"{enumType}\" not in config file.")
+            exit()
         
         return lst # contains the path of all wordlists
 
@@ -42,24 +46,33 @@ class LoadSettings:
     
     def getHeaders(self, path):
         headers = {}
-        with open(path, 'r') as file:
-            for line in file:
-                line = line.strip()
-                if not line:
-                    continue
-                if ':' in line:
+        try:
+            with open(path, 'r') as file:
+                for line in file:
+                    line = line.strip()
+                    if not line or ':' not in line:
+                        continue
                     key, value = line.split(':', 1)
                     headers[key.strip()] = value.strip()
+        except FileNotFoundError:
+            print(f"Error: Headers file not found: {path}")
+        except Exception as e:
+            print("Error while opening the file: " + path)
+        
         return headers
     
     def getCookies(self, path):
         cookies = {}
-        with open(path, 'r') as file:
-            for line in file:
-                line = line.strip()
-                if not line:
-                    continue
-                if '=' in line:
+        try:
+            with open(path, 'r') as file:
+                for line in file:
+                    line = line.strip()
+                    if not line or '=' not in line:
+                        continue
                     key, value = line.split('=', 1)
                     cookies[key.strip()] = value.strip()
+        except FileNotFoundError:
+            print(f"Error: Cookies file not found: {path}")
+        except Exception as e:
+            print("Error while opening the file: " + path)
         return cookies

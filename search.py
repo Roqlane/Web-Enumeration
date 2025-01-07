@@ -21,7 +21,7 @@ class Search:
         self.fuzz_mode = fuzz_mode
         
     async def is_server_up(self, session):
-        """Sends a request with a premade session to check if the target server is up"""
+        """Send a request with a premade session to check if the target server is up"""
         try:
             async with session.head(self.url, timeout=self.timeout) as response:
                 return response.status < 500
@@ -30,20 +30,15 @@ class Search:
             return False
     
     def get_url(self, url):
-        """Makes sure the entered url is in a valid format."""
-        finalUrl = ""
-        if "http" not in url and "https" not in url:
-            finalUrl = "http://" + url
-        else:
-            finalUrl = url
-            
-        if finalUrl[-1] != '/':        
-            finalUrl += '/'
-            
-        return finalUrl
+        """Make sure the given url is in a valid format."""
+        if not url.startswith(("http://", "https://")):
+            url = f"http://{url}"
+        if not url.endswith('/'):
+            url += '/'
+        return url
             
     async def request_url(self, session, semaphore, timeout, endpoint, currentIndex, endpoints_found):
-        """Sends the request"""
+        """Send the request"""
         #fuzz mode activated
         if self.fuzz_mode:
             #vhost enumeration
@@ -69,7 +64,7 @@ class Search:
             
 
     async def search_urls(self, wordlist, endpoints_found):
-        """Adds all requests in a pool"""
+        """Add all requests in a pool"""
         async with aiohttp.ClientSession(headers=self.headers, cookies=self.cookies) as session:
             if await self.is_server_up(session):
                 semaphore = asyncio.Semaphore(self.max_concurrency)
@@ -89,7 +84,7 @@ class Search:
                     raise
             
     def run_search(self, wordlist, endpoints_found):
-        """Handles the enumeration. Stops if any errors"""
+        """Handle the enumeration. Stops if any errors"""
         loop = asyncio.get_event_loop()
         # Register the signal handler for Ctrl+C
         for sig in (signal.SIGINT, signal.SIGTERM):
