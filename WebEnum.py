@@ -48,6 +48,9 @@ def main(args):
     max_concurrency = args.max_concurrency
     fuzz_mode = args.fuzz
     
+    if fuzz_mode and "FUZZ" not in target_url:
+        exit("Error: FUZZ word is missing in the url.")
+    
     if wordlists == None:
         enumType = args.type
         wordlists = settingsLoader.getConfigWordlists(enumType)
@@ -76,7 +79,7 @@ def main(args):
         max_concurrency = settingsLoader.getSettings("max_concurrency")
 
     searcher = Search(target_url, method,  cookies, headers, extensions, status_codes,
-                    timeout, time_interval, max_concurrency)
+                    timeout, time_interval, max_concurrency, fuzz_mode)
         
     endpoints = getEndpoints(wordlists, settingsLoader)
     
@@ -95,7 +98,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Enum a webpage asynchronously \
                         with different wordlists")
-    parser.add_argument("-u", "--url", help="Url to scan")
+    parser.add_argument("url", help="Url to scan")
     parser.add_argument("-w", "--wordlists", nargs='+', help="You can enter a single or several \
                         wordlists that will be used for the enumeration")
     parser.add_argument("-x", "--extensions", help="The extensions that will be added to each \
@@ -118,7 +121,10 @@ if __name__ == "__main__":
     parser.add_argument("--time-interval", help="Time to wait between each request (s)", type=float)
     parser.add_argument("--max-concurrency", help="Number of simultaneous requests", type=int)
     parser.add_argument("--fuzz", help="Fuzzing mode: This works the same than in normal mode except \
-                        you have to write \"FUZZ\" inside the url", action='store_true', default=False)
+                        you have to write \"FUZZ\" inside the url. For vhost enumeration, the script will \
+                        identify the position of the word FUZZ (it must be placed inside the host) \
+                        and will set automatically the Host header accordingly. Otherwise, normal \
+                        fuzzing will be performed", action='store_true', default=False)
     #parser.add_argument("-R", "--recursive", help="Search the page recursively", default=False, action='store_true')
 
     args = parser.parse_args()

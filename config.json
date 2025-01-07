@@ -4,7 +4,7 @@
         "config": "wordlists/config.txt",
         "hidden": "wordlists/hidden.txt",
         "common": "wordlists/common.txt",
-        "custom": "/home/meow/Pentest/Wordlist/SecLists-master/Discovery/Web-Content/big.txt"
+        "custom": "/home/user/SecLists-master/Discovery/Web-Content/big.txt"
     },
     "settings": {
         "status_codes": ["200", "403", "302"],

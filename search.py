@@ -2,13 +2,14 @@ import aiohttp
 import asyncio
 import signal
 from colors import *
-
+from urllib.parse import urlparse
 
 
 class Search:
     def __init__(self, url, method, cookies, headers, extensions, status_code,
-                 timeout, time_interval, max_concurrency):
+                 timeout, time_interval, max_concurrency, fuzz_mode):
         self.url = self.get_url(url)
+        self.host = urlparse(self.url).netloc
         self.method = method
         self.cookies = cookies
         self.headers = headers
@@ -17,6 +18,7 @@ class Search:
         self.timeout = timeout
         self.time_interval = time_interval
         self.max_concurrency = max_concurrency
+        self.fuzz_mode = fuzz_mode
         
     async def is_server_up(self, session):
         """Sends a request with a premade session to check if the target server is up"""
@@ -42,7 +44,14 @@ class Search:
             
     async def request_url(self, session, semaphore, timeout, endpoint, currentIndex, endpoints_found):
         """Sends the request"""
-        complete_url = self.url + endpoint
+        #fuzz mode activated
+        if self.fuzz_mode:
+            #vhost enumeration
+            if self.fuzz_in_host():
+                self.set_host_header(endpoint)
+            complete_url = self.url.replace("FUZZ", endpoint)
+        else:
+            complete_url = self.url + endpoint
         async with semaphore:
             await asyncio.sleep(self.time_interval)
             try:
@@ -97,3 +106,10 @@ class Search:
         """Signal handler to cancel tasks on Ctrl+C."""
         for task in asyncio.all_tasks(loop=loop):
             task.cancel()
+            
+    def fuzz_in_host(self):
+        """Check if 'FUZZ' is in the host"""
+        return 'FUZZ' in self.host
+
+    def set_host_header(self, endpoint):
+        self.headers["Host"] = self.host.replace("FUZZ", endpoint)
