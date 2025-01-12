@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import signal
+import ssl
 from colors import *
 from urllib.parse import urlparse
 
@@ -8,6 +9,7 @@ from urllib.parse import urlparse
 class Search:
     def __init__(self, url, method, cookies, headers, extensions, status_code,
                  timeout, time_interval, max_concurrency, fuzz_mode):
+        self.fuzz_mode = fuzz_mode
         self.url = self.get_url(url)
         self.host = urlparse(self.url).netloc
         self.method = method
@@ -18,12 +20,21 @@ class Search:
         self.timeout = timeout
         self.time_interval = time_interval
         self.max_concurrency = max_concurrency
-        self.fuzz_mode = fuzz_mode
+        self.ssl_context = self.create_ssl_context()
+        
+    def create_ssl_context(self):
+            # For ctf, the certificate may not be valid. This ignore this case.
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            return ssl_context
         
     async def is_server_up(self, session):
         """Send a request with a premade session to check if the target server is up"""
-        try:
-            async with session.head(self.url, timeout=self.timeout) as response:
+        try:            
+            url = self.remove_fuzz_from_host()
+            async with session.head(url, timeout=self.timeout, ssl=self.ssl_context) as response:
                 return response.status < 500
         except Exception as e:
             print(f"{RED}[-] Server check failed : {e}{END}")
@@ -35,6 +46,7 @@ class Search:
             url = f"http://{url}"
         if not url.endswith('/'):
             url += '/'
+        
         return url
             
     async def request_url(self, session, semaphore, timeout, endpoint, currentIndex, endpoints_found):
@@ -44,22 +56,29 @@ class Search:
             #vhost enumeration
             if self.fuzz_in_host():
                 self.set_host_header(endpoint)
-            complete_url = self.url.replace("FUZZ", endpoint)
+                complete_url = self.remove_fuzz_from_host()
+            else:
+                complete_url = self.url.replace("FUZZ", endpoint)
         else:
             complete_url = self.url + endpoint
         async with semaphore:
             await asyncio.sleep(self.time_interval)
             try:
                 async with session.request(self.method, complete_url, timeout=timeout,
-                                           allow_redirects=False) as resp:                
-                    if str(resp.status) in self.status_code and endpoint not in endpoints_found:
+                                           allow_redirects=False, ssl=self.ssl_context) as resp:
+                    #content = await resp.read()
+                    if self.fuzz_mode and self.fuzz_in_host():
+                       print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}){END}")   
+                                     
+                    elif str(resp.status) in self.status_code and endpoint not in endpoints_found:
                         print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url} (Code : {resp.status}){END}")
                         endpoints_found.append(endpoint)
-            except aiohttp.ClientError as e:            
+            except aiohttp.ClientError as e:
                 raise RuntimeError(e)
             except asyncio.TimeoutError as e:
                 print(f"{RED}[-] Timeout : {complete_url}{END}")
-            except Exception:
+            except Exception as e:
+                print(e)
                 print(f"{RED}[-] Failed : {complete_url}{END}")
             
 
@@ -108,3 +127,9 @@ class Search:
 
     def set_host_header(self, endpoint):
         self.headers["Host"] = self.host.replace("FUZZ", endpoint)
+        
+    def remove_fuzz_from_host(self):
+        url = self.url
+        if self.fuzz_mode and self.fuzz_in_host():
+            url = url.replace("FUZZ.", "")
+        return url

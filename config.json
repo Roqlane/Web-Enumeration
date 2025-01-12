@@ -6,7 +6,7 @@
         "common": "wordlists/common.txt"
     },
     "settings": {
-        "status_codes": ["200", "403", "302"],
+        "status_codes": ["200","204","301","302","307","401","403"],
         "extensions": [""],
         "headers": {},
         "cookies": {},
