@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import signal
+import json
 import ssl
 from colors import *
 from urllib.parse import urlparse
@@ -8,8 +9,9 @@ from urllib.parse import urlparse
 
 class Search:
     def __init__(self, url, method, cookies, headers, extensions, status_code,
-                 timeout, time_interval, max_concurrency, fuzz_mode):
-        self.fuzz_mode = fuzz_mode
+                 timeout, time_interval, max_concurrency, mode, params, 
+                 error_response, hidden_status_codes, hidden_filesizes):
+        self.mode = mode
         self.url = self.get_url(url)
         self.host = urlparse(self.url).netloc
         self.method = method
@@ -21,6 +23,10 @@ class Search:
         self.time_interval = time_interval
         self.max_concurrency = max_concurrency
         self.ssl_context = self.create_ssl_context()
+        self.params = params
+        self.error_response = error_response
+        self.hidden_status_codes = hidden_status_codes
+        self.hidden_filesizes = hidden_filesizes
         
     def create_ssl_context(self):
             # For ctf, the certificate may not be valid. This ignore this case.
@@ -48,31 +54,50 @@ class Search:
             url += '/'
         
         return url
-            
-    async def request_url(self, session, semaphore, timeout, endpoint, currentIndex, endpoints_found):
-        """Send the request"""
-        #fuzz mode activated
-        if self.fuzz_mode:
-            #vhost enumeration
-            if self.fuzz_in_host():
-                self.set_host_header(endpoint)
-                complete_url = self.remove_fuzz_from_host()
+    
+    async def display_result(self, resp, complete_url, results_found, endpoint, currentIndex):
+        content_length = resp.headers.get("Content-Length")
+        status = str(resp.status)
+        text = await resp.text()
+        
+        valid_status = status in self.status_code and status not in self.hidden_status_codes
+        valid_size = content_length not in self.hidden_filesizes
+        endpoint_not_found = endpoint not in results_found
+        
+        if valid_status and valid_size and endpoint_not_found:
+            results_found.append(endpoint)
+            if self.mode == "vhost":
+                print(f"{getColor(resp.status)}[+] Found : {endpoint}.{self.host} (Code : {resp.status}){END}")
+            elif self.mode == "fuzz":
+                print(f"{getColor(resp.status)}[+] Found : {endpoint} (Code : {resp.status}){END}")
+            elif self.mode == "force" and self.error_response not in text:
+                print(f"{getColor(resp.status)}[+] Found : {endpoint} (Code : {resp.status}){END}")
             else:
-                complete_url = self.url.replace("FUZZ", endpoint)
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url} (Code : {resp.status}){END}")
+                
+    async def request_url(self, session, semaphore, timeout, endpoint, currentIndex, results_found):
+        """Send the request"""       
+        headers = self.headers
+        cookies = self.cookies
+        params = self.params
+        #vhost mode
+        if self.mode == "vhost":
+            cookies["Host"] = endpoint + "." + self.host
+        #fuzz mode
+        elif self.mode == "fuzz" or self.mode == "force":
+            if self.are_params_json():
+                self.headers["Content-Type"] = "application/json"
+            complete_url, headers, cookies, params = self.replace_fuzz_keyword(headers, cookies, params, endpoint)
+        #dir mode
         else:
             complete_url = self.url + endpoint
         async with semaphore:
             await asyncio.sleep(self.time_interval)
             try:
-                async with session.request(self.method, complete_url, timeout=timeout,
-                                           allow_redirects=False, ssl=self.ssl_context) as resp:
-                    #content = await resp.read()
-                    if self.fuzz_mode and self.fuzz_in_host():
-                       print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}){END}")   
-                                     
-                    elif str(resp.status) in self.status_code and endpoint not in endpoints_found:
-                        print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url} (Code : {resp.status}){END}")
-                        endpoints_found.append(endpoint)
+                async with session.request(self.method, complete_url, headers=self.headers, cookies=self.cookies, 
+                    timeout=timeout, allow_redirects=False, ssl=self.ssl_context) as resp:
+                    self.display_result(resp, complete_url, results_found, endpoint, currentIndex)
+
             except aiohttp.ClientError as e:
                 raise RuntimeError(e)
             except asyncio.TimeoutError as e:
@@ -84,7 +109,7 @@ class Search:
 
     async def search_urls(self, wordlist, endpoints_found):
         """Add all requests in a pool"""
-        async with aiohttp.ClientSession(headers=self.headers, cookies=self.cookies) as session:
+        async with aiohttp.ClientSession() as session:
             if await self.is_server_up(session):
                 semaphore = asyncio.Semaphore(self.max_concurrency)
                 timeout = aiohttp.ClientTimeout(total=self.timeout)
@@ -120,16 +145,23 @@ class Search:
         """Signal handler to cancel tasks on Ctrl+C."""
         for task in asyncio.all_tasks(loop=loop):
             task.cancel()
-            
-    def fuzz_in_host(self):
-        """Check if 'FUZZ' is in the host"""
-        return 'FUZZ' in self.host
 
-    def set_host_header(self, endpoint):
-        self.headers["Host"] = self.host.replace("FUZZ", endpoint)
+    def replace_fuzz_keyword(self, headers, cookies, params, endpoint):
+            for h in self.headers:
+                headers[h] = self.headers[h].replace("FUZZ", endpoint)
+            for c in self.cookies:
+                cookies[c] = self.cookies[c].replace("FUZZ", endpoint)
+            for p in params:
+                params[p] = self.params.replace("FUZZ", endpoint)
+            complete_url = self.url.replace("FUZZ", endpoint)
+            
+            return complete_url, headers, cookies, params
+    
+    def are_params_json(self):
+        try:
+            self.params = json.loads(self.params)
+        except:
+            return False
         
-    def remove_fuzz_from_host(self):
-        url = self.url
-        if self.fuzz_mode and self.fuzz_in_host():
-            url = url.replace("FUZZ.", "")
-        return url
+        return True
+        

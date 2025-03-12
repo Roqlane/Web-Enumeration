@@ -30,6 +30,13 @@ def getEndpoints(wordlists, loader: LoadSettings):
             data.append(e)
             
     return data
+
+def fuzzWordExists(url, cookies, headers, params):
+    return "FUZZ" in url or \
+            "FUZZ" in cookies.keys() or "FUZZ" in cookies.values() or \
+            "FUZZ" in headers.keys() or "FUZZ" in headers.values() or \
+            "FUZZ" in params
+    
     
 def main(args):    
     urls_found = []
@@ -39,17 +46,41 @@ def main(args):
     wordlists = args.wordlists
     enumType = args.type
     extensions = args.extensions
+    mode = args.mode
+    
+    hidden_status_codes = args.hidden_codes
     status_codes = args.status_codes
+    hidden_filesizes = args.hidden_sizes
     cookies = args.cookies
     headers = args.headers
     method = args.method
+    params = args.params
+    error_response = args.error
+    
+    if args.params:
+        try:
+            json.loads(args.params)
+        except ValueError:
+            extracted = args.remove("&").split("=")
+            l = len(extracted) // 2
+            params = dict()
+            for i in range(0, l, 2):
+                try:
+                    params[extracted[i]] = extracted[i+1]
+                except Exception as e:
+                    print("Bad parameters format:" + str(e))
+                
+            
+    
     timeout = args.timeout
     time_interval = args.time_interval
     max_concurrency = args.max_concurrency
-    fuzz_mode = args.fuzz
     
-    if fuzz_mode and "FUZZ" not in target_url:
-        exit("Error: FUZZ word is missing in the url.")
+    if (mode == "fuzz" or mode == "force") and not fuzzWordExists(target_url, cookies, ):
+        exit("Error: FUZZ is missing.")
+        
+    if mode == "force" and (params == None or args.error == None):
+        exit("Force mode used but it is missing: --params or --error") 
     
     if wordlists == None:
         wordlists = settingsLoader.getConfigWordlists(enumType)
@@ -77,8 +108,8 @@ def main(args):
     if max_concurrency == None:
         max_concurrency = settingsLoader.getSettings("max_concurrency")
 
-    searcher = Search(target_url, method,  cookies, headers, extensions, status_codes,
-                    timeout, time_interval, max_concurrency, fuzz_mode)
+    searcher = Search(target_url, method,  cookies, headers, extensions, status_codes, timeout, 
+            time_interval, max_concurrency, mode, params, error_response, hidden_status_codes, hidden_filesizes)
         
     endpoints = getEndpoints(wordlists, settingsLoader)
     
@@ -99,7 +130,7 @@ if __name__ == "__main__":
     banner()
     start = time.time()    
     
-    parser = argparse.ArgumentParser(description="Enum a webpage asynchronously \
+    parser = argparse.ArgumentParser(description="Perform a website enumeration asynchronously \
                         with different wordlists")
     parser.add_argument("url", help="Url to scan")
     parser.add_argument("-w", "--wordlists", nargs='+', help="You can enter a single or several \
@@ -108,7 +139,9 @@ if __name__ == "__main__":
                         endpoint of wordlist", nargs='+')
     parser.add_argument("-xf", "--extensions-file", help="File containing extensions")
     parser.add_argument("-sc", "--status-codes", help="The status codes that will be returned \
-                        (default: 200, 302)", nargs='+')
+                        (default: 200,204,301,302,307,401,403)", nargs='+')
+    parser.add_argument("-hc", "--hidden-codes", help="Hide requests with these status codes", nargs='+')
+    parser.add_argument("-hs", "--hidden-sizes", help="Hide requests with these sizes", nargs='+')
     parser.add_argument("-H", "--headers", help="Headers you would like to add to the requests. \
                         Example: {\"key1\":\"value1\", \"key2\":\"value2\"}", type=json.loads)
     parser.add_argument("-Hf", "--headers-file", help="File containing headers (json format)")
@@ -123,11 +156,21 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", help="Stop sending requests after this long (s)", type=int)
     parser.add_argument("--time-interval", help="Time to wait between each request (s)", type=float)
     parser.add_argument("--max-concurrency", help="Number of simultaneous requests", type=int)
-    parser.add_argument("--fuzz", help="Fuzzing mode: This works the same than in normal mode except \
-                        you have to write \"FUZZ\" inside the url. For vhost enumeration, the script will \
-                        identify the position of the word FUZZ (it must be placed inside the host) \
-                        and will set automatically the Host header accordingly. Otherwise, normal \
-                        fuzzing will be performed", action='store_true', default=False)
+    parser.add_argument("--mode", choices=["dir", "vhost", "fuzz", "force"], default="dir", help="""dir, vhost, fuzz, force\n \
+                        Dir mode: perform directory enumeration
+                        Vhost mode: perform vhost enumeration by setting the Host header with the wordlist content
+                        Fuzzing mode: perform fuzzing on headers value, cookies value, [GET|POST|PUT|DELETE] parameters
+                        \n The word FUZZ needs to be included. You can include FUZZ inside multiple fields. \
+                        You can choose to put the FUZZ keyword inside the url. \
+                        Example:
+                            python3 WebEnum.py http://localhost/login --fuzz --method POST --params \"login=admin&password=FUZZ\" \
+                            or '{\"login\":\"admin\",\"password\":\"FUZZ\"}' \
+                            python3 WebEnum.py http://localhost/login --fuzz -H {\"session\":\"FUZZ\"} \
+                            python3 WebEnum.py http://localhost/import?file=FUZZ --fuzz \
+                        Force mode: same as FUZZ except it requires an error value to confirm the success of the attack
+                        Example: python3 WebEnum.py http://localhost/import?file=FUZZ --fuzz --method POST --params \
+                        \"login=admin&password=FUZZ\" --error \"Wrong credentials\""
+                        """)
     #parser.add_argument("-R", "--recursive", help="Search the page recursively", default=False, action='store_true')
 
     args = parser.parse_args()

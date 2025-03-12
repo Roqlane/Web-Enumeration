@@ -3,7 +3,8 @@
         "backup": "wordlists/backup.txt",
         "config": "wordlists/config.txt",
         "hidden": "wordlists/hidden.txt",
-        "common": "wordlists/common.txt"
+        "common": "wordlists/common.txt",
+        "vhosts": ""
     },
     "settings": {
         "status_codes": ["200","204","301","302","307","401","403"],
