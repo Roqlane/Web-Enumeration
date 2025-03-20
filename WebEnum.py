@@ -61,7 +61,7 @@ def main(args):
         try:
             json.loads(args.params)
         except ValueError:
-            extracted = args.remove("&").split("=")
+            extracted = args.params.replace("&", "").split("=")
             l = len(extracted) // 2
             params = dict()
             for i in range(0, l, 2):
@@ -76,7 +76,7 @@ def main(args):
     time_interval = args.time_interval
     max_concurrency = args.max_concurrency
     
-    if (mode == "fuzz" or mode == "force") and not fuzzWordExists(target_url, cookies, ):
+    if (mode == "fuzz" or mode == "force") and not fuzzWordExists(target_url, cookies, headers, params):
         exit("Error: FUZZ is missing.")
         
     if mode == "force" and (params == None or args.error == None):
@@ -140,8 +140,8 @@ if __name__ == "__main__":
     parser.add_argument("-xf", "--extensions-file", help="File containing extensions")
     parser.add_argument("-sc", "--status-codes", help="The status codes that will be returned \
                         (default: 200,204,301,302,307,401,403)", nargs='+')
-    parser.add_argument("-hc", "--hidden-codes", help="Hide requests with these status codes", nargs='+')
-    parser.add_argument("-hs", "--hidden-sizes", help="Hide requests with these sizes", nargs='+')
+    parser.add_argument("-hc", "--hidden-codes", help="Hide requests with these status codes", nargs='+', default=[])
+    parser.add_argument("-hs", "--hidden-sizes", help="Hide requests with these sizes", nargs='+', default=[])
     parser.add_argument("-H", "--headers", help="Headers you would like to add to the requests. \
                         Example: {\"key1\":\"value1\", \"key2\":\"value2\"}", type=json.loads)
     parser.add_argument("-Hf", "--headers-file", help="File containing headers (json format)")
@@ -157,20 +157,21 @@ if __name__ == "__main__":
     parser.add_argument("--time-interval", help="Time to wait between each request (s)", type=float)
     parser.add_argument("--max-concurrency", help="Number of simultaneous requests", type=int)
     parser.add_argument("--mode", choices=["dir", "vhost", "fuzz", "force"], default="dir", help="""dir, vhost, fuzz, force\n \
-                        Dir mode: perform directory enumeration
+                        Dir mode: perform directory enumeration (Default)
                         Vhost mode: perform vhost enumeration by setting the Host header with the wordlist content
                         Fuzzing mode: perform fuzzing on headers value, cookies value, [GET|POST|PUT|DELETE] parameters
+                        Force mode: same as fuzz mode except it requires the --error field to confirm the success of the attack
                         \n The word FUZZ needs to be included. You can include FUZZ inside multiple fields. \
                         You can choose to put the FUZZ keyword inside the url. \
                         Example:
-                            python3 WebEnum.py http://localhost/login --fuzz --method POST --params \"login=admin&password=FUZZ\" \
+                            python3 WebEnum.py http://localhost/login --mode fuzz --method POST --params \"login=admin&password=FUZZ\" \
                             or '{\"login\":\"admin\",\"password\":\"FUZZ\"}' \
-                            python3 WebEnum.py http://localhost/login --fuzz -H {\"session\":\"FUZZ\"} \
-                            python3 WebEnum.py http://localhost/import?file=FUZZ --fuzz \
-                        Force mode: same as FUZZ except it requires an error value to confirm the success of the attack
-                        Example: python3 WebEnum.py http://localhost/import?file=FUZZ --fuzz --method POST --params \
-                        \"login=admin&password=FUZZ\" --error \"Wrong credentials\""
+                            python3 WebEnum.py http://localhost/import?file=FUZZ --mode fuzz
+                            python3 WebEnum.py http://localhost/login --mode force -H {\"session\":\"FUZZ\"} --error "Incorrect session"
+                            python3 WebEnum.py http://localhost/ --mode vhost -w SecLists-master/Discovery/DNS/subdomains-top1million-110000.txt
                         """)
+    parser.add_argument("--params", help="Json or POST data format")
+    parser.add_argument("--error", help="Works with force mode. It must contains the response in case of incorrect indredentials")
     #parser.add_argument("-R", "--recursive", help="Search the page recursively", default=False, action='store_true')
 
     args = parser.parse_args()

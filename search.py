@@ -28,6 +28,12 @@ class Search:
         self.hidden_status_codes = hidden_status_codes
         self.hidden_filesizes = hidden_filesizes
         
+    def __str__(self):
+        #TODO
+        #I want to display the search object
+        #By showing the main arguments
+        pass
+        
     def create_ssl_context(self):
             # For ctf, the certificate may not be valid. This ignore this case.
             ssl_context = ssl.create_default_context()
@@ -38,8 +44,10 @@ class Search:
         
     async def is_server_up(self, session):
         """Send a request with a premade session to check if the target server is up"""
-        try:            
-            url = self.remove_fuzz_from_host()
+        try:
+            url = self.url
+            if self.mode == "force" or self.mode == "fuzz":            
+                url, _,_,_ = self.replace_fuzz_keyword(self.headers, self.cookies, self.params, "")
             async with session.head(url, timeout=self.timeout, ssl=self.ssl_context) as response:
                 return response.status < 500
         except Exception as e:
@@ -67,11 +75,11 @@ class Search:
         if valid_status and valid_size and endpoint_not_found:
             results_found.append(endpoint)
             if self.mode == "vhost":
-                print(f"{getColor(resp.status)}[+] Found : {endpoint}.{self.host} (Code : {resp.status}){END}")
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint}.{self.host} (Code : {resp.status}){END}")
             elif self.mode == "fuzz":
-                print(f"{getColor(resp.status)}[+] Found : {endpoint} (Code : {resp.status}){END}")
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}){END}")
             elif self.mode == "force" and self.error_response not in text:
-                print(f"{getColor(resp.status)}[+] Found : {endpoint} (Code : {resp.status}){END}")
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}){END}")
             else:
                 print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url} (Code : {resp.status}){END}")
                 
@@ -83,7 +91,7 @@ class Search:
         #vhost mode
         if self.mode == "vhost":
             cookies["Host"] = endpoint + "." + self.host
-        #fuzz mode
+        #fuzz or force mode
         elif self.mode == "fuzz" or self.mode == "force":
             if self.are_params_json():
                 self.headers["Content-Type"] = "application/json"
@@ -96,7 +104,7 @@ class Search:
             try:
                 async with session.request(self.method, complete_url, headers=self.headers, cookies=self.cookies, 
                     timeout=timeout, allow_redirects=False, ssl=self.ssl_context) as resp:
-                    self.display_result(resp, complete_url, results_found, endpoint, currentIndex)
+                    await self.display_result(resp, complete_url, results_found, endpoint, currentIndex)
 
             except aiohttp.ClientError as e:
                 raise RuntimeError(e)
@@ -147,15 +155,18 @@ class Search:
             task.cancel()
 
     def replace_fuzz_keyword(self, headers, cookies, params, endpoint):
+        if headers != None:
             for h in self.headers:
                 headers[h] = self.headers[h].replace("FUZZ", endpoint)
+        if cookies != None:
             for c in self.cookies:
                 cookies[c] = self.cookies[c].replace("FUZZ", endpoint)
+        if params != None:
             for p in params:
-                params[p] = self.params.replace("FUZZ", endpoint)
-            complete_url = self.url.replace("FUZZ", endpoint)
+                params[p] = self.params[p].replace("FUZZ", endpoint)
+        complete_url = self.url.replace("FUZZ", endpoint)
             
-            return complete_url, headers, cookies, params
+        return complete_url, headers, cookies, params
     
     def are_params_json(self):
         try:
