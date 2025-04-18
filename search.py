@@ -67,7 +67,7 @@ class Search:
         try:
             url = self.url
             if self.mode == "force" or self.mode == "fuzz":            
-                url, _,_,_ = self.replace_fuzz_keyword(self.headers, self.cookies, self.params, "")
+                url, _,_,_ = self.replace_fuzz_keyword(None, None, None, "")
             async with session.head(url, timeout=self.timeout, ssl=self.ssl_context) as response:
                 return response.status < 500
         except Exception as e:
@@ -78,6 +78,7 @@ class Search:
         """Make sure the given url is in a valid format."""
         if not url.startswith(("http://", "https://")):
             url = f"http://{url}"
+            
         if not url.endswith('/'):
             url += '/'
         
@@ -114,8 +115,6 @@ class Search:
             headers["Host"] = endpoint + "." + self.host
         #fuzz or force mode
         elif self.mode == "fuzz" or self.mode == "force":
-            if self.are_params_json():
-                self.headers["Content-Type"] = "application/json"
             complete_url, headers, cookies, params = self.replace_fuzz_keyword(headers, cookies, params, endpoint)
         #dir mode
         else:
@@ -123,9 +122,14 @@ class Search:
         async with semaphore:
             await asyncio.sleep(self.time_interval)
             try:
-                async with session.request(self.method, complete_url, headers=self.headers, cookies=self.cookies, 
-                    timeout=timeout, allow_redirects=False, ssl=self.ssl_context) as resp:
-                    await self.display_result(resp, complete_url, results_found, endpoint, currentIndex)
+                if "Content-Type" in headers and headers["Content-Type"] == "application/json":
+                    async with session.request(self.method, complete_url, json=params, headers=self.headers, cookies=self.cookies, 
+                        timeout=timeout, allow_redirects=False, ssl=self.ssl_context) as resp:
+                        await self.display_result(resp, complete_url, results_found, endpoint, currentIndex)
+                else:
+                    async with session.request(self.method, complete_url, data=params, headers=self.headers, cookies=self.cookies, 
+                        timeout=timeout, allow_redirects=False, ssl=self.ssl_context) as resp:
+                        await self.display_result(resp, complete_url, results_found, endpoint, currentIndex)
 
             except aiohttp.ClientError as e:
                 raise RuntimeError(e)
@@ -188,12 +192,4 @@ class Search:
         complete_url = self.url.replace("FUZZ", endpoint)
             
         return complete_url, headers, cookies, params
-    
-    def are_params_json(self):
-        try:
-            self.params = json.loads(self.params)
-        except:
-            return False
-        
-        return True
         

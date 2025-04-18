@@ -16,7 +16,7 @@ def banner():
     print(font)
     
 def displayNumberOfRequests(endpoints, extensions):
-    n = len(endpoints * (len(extensions) + 1))
+    n = len(endpoints) * len(extensions)
     print(f"\nLoading {n} requests... This process can take time.\n")
     
 def getEndpoints(wordlists, loader: LoadSettings):
@@ -30,7 +30,6 @@ def getEndpoints(wordlists, loader: LoadSettings):
 def fuzzWordExists(url, cookies, headers, params):
     if "FUZZ" in url:
         return True
-    print(params)
     if params != None:
         if "FUZZ" in params.keys() or "FUZZ" in params.values():
             return True
@@ -65,8 +64,13 @@ def main(args):
     error_response = args.error
     
     if args.params:
+        #adapt to json
         try:
-            json.loads(args.params)
+            params = json.loads(args.params)
+            if headers != None:
+                headers["Content-Type"] = "application/json"
+            else:
+                headers = {"Content-Type": "application/json"}
         except ValueError:
             extracted = args.params.split("&")
             extracted = [e.split("=") for e in extracted]
