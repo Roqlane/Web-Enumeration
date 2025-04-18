@@ -65,12 +65,33 @@ There is a `config.json` file available with the tool in order for you to set se
 }
 ```
 
-## FUZZ mode
+## Vhost mode
 
-The tools allows a "fuzz" mode in order to enumerate vhosts or in case there is a GET parameter in the url redirecting to other pages.
+There is a vhost mode for vhosts enumeration:
 
-### Example
+`python3 WebEnum.py http://localhost: --mode vhost -w vhosts.txt`
 
-`python3 WebEnum.py http://FUZZ.foo.bar/ --fuzz`
+## Fuzz mode
 
-`python3 WebEnum.py http://foo.bar/?file=FUZZ --fuzz`
+There is a fuzzing mode to perform further enumeration. It is needed to put the keyword "FUZZ" in the field that will be fuzzed. You can put it in the url, a header field or a cookie field.
+
+### Examples
+
+`python3 WebEnum.py http://localhost:5000/?params=FUZZ --mode fuzz'` 
+
+
+`python3 WebEnum.py http://localhost:5000/admin --mode fuzz --cookies '{"field":"FUZZ"}'` 
+
+`python3 WebEnum.py http://localhost:5000/admin --mode fuzz --headers '{"field":"FUZZ"}'` 
+
+## Force mode
+
+To brute-force a login form, for example:
+
+If the webapp expects json data
+
+`python3 WebEnum.py http://localhost:5000/admin -m POST --mode force --params '{"username":"admin","password":"FUZZ"}' --error "Forbidden" -w test.txt`
+
+else:
+
+`python3 WebEnum.py http://localhost:5000/admin -m POST --mode force --params 'username=admin&password=FUZZ' --error "Forbidden"`
