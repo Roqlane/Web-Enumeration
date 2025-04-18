@@ -16,11 +16,7 @@ def banner():
     print(font)
     
 def displayNumberOfRequests(endpoints, extensions):
-    n = 0
-    for _ in endpoints:
-        for _ in extensions:
-            n += 1
-        
+    n = len(endpoints * (len(extensions) + 1))
     print(f"\nLoading {n} requests... This process can take time.\n")
     
 def getEndpoints(wordlists, loader: LoadSettings):
@@ -32,10 +28,21 @@ def getEndpoints(wordlists, loader: LoadSettings):
     return data
 
 def fuzzWordExists(url, cookies, headers, params):
-    return "FUZZ" in url or \
-            "FUZZ" in cookies.keys() or "FUZZ" in cookies.values() or \
-            "FUZZ" in headers.keys() or "FUZZ" in headers.values() or \
-            "FUZZ" in params
+    if "FUZZ" in url:
+        return True
+    print(params)
+    if params != None:
+        if "FUZZ" in params.keys() or "FUZZ" in params.values():
+            return True
+    if cookies != None:
+        if "FUZZ" in cookies.keys() or "FUZZ" in cookies.values():
+            return True
+    if headers != None:
+        if "FUZZ" in headers.keys() or "FUZZ" in headers.values():
+            return True
+        
+    return False
+            
     
     
 def main(args):    
@@ -61,15 +68,15 @@ def main(args):
         try:
             json.loads(args.params)
         except ValueError:
-            extracted = args.params.replace("&", "").split("=")
-            l = len(extracted) // 2
+            extracted = args.params.split("&")
+            extracted = [e.split("=") for e in extracted]
             params = dict()
-            for i in range(0, l, 2):
+            for e in extracted:
                 try:
-                    params[extracted[i]] = extracted[i+1]
+                    params[e[0]] = e[1]
                 except Exception as e:
                     print("Bad parameters format:" + str(e))
-                
+                    
             
     
     timeout = args.timeout
@@ -113,14 +120,8 @@ def main(args):
         
     endpoints = getEndpoints(wordlists, settingsLoader)
     
-    print("Headers:")
-    print(headers)
-    print("Cookies:")
-    print(cookies)
     print(f"Wordlists:  {', '.join(wordlists)}")
-    print(f"Extension: {', '.join(extensions)}")
-    print(f"Status Codes: {', '.join(status_codes)}")
-            
+    print(searcher)
     displayNumberOfRequests(endpoints, extensions)
 
     searcher.run_search(endpoints, urls_found)
@@ -131,7 +132,7 @@ if __name__ == "__main__":
     start = time.time()    
     
     parser = argparse.ArgumentParser(description="Perform a website enumeration asynchronously \
-                        with different wordlists")
+                        with different wordlists", usage="python3 WebEnum.py url [options]")
     parser.add_argument("url", help="Url to scan")
     parser.add_argument("-w", "--wordlists", nargs='+', help="You can enter a single or several \
                         wordlists that will be used for the enumeration")
@@ -149,23 +150,23 @@ if __name__ == "__main__":
                         Example: {\"key1\":\"value1\", \"key2\":\"value2\"}", type=json.loads)
     parser.add_argument("-cf", "--cookies-file", help="File containing cookies (json format)")
     parser.add_argument("-m", "--method", help="You can chose which request mode you want to use", 
-                        default="GET")
+                        choices=["GET","POST","PUT","DELETE"],default="GET")
     parser.add_argument("--type", help="If no wordlists were to be entered, you could chose which \
                         type of file (backup, common...) to search with the provided wordlists \
                         (default: all)", default="all")
     parser.add_argument("--timeout", help="Stop sending requests after this long (s)", type=int)
     parser.add_argument("--time-interval", help="Time to wait between each request (s)", type=float)
     parser.add_argument("--max-concurrency", help="Number of simultaneous requests", type=int)
-    parser.add_argument("--mode", choices=["dir", "vhost", "fuzz", "force"], default="dir", help="""dir, vhost, fuzz, force\n \
+    parser.add_argument("--mode", choices=["dir", "vhost", "fuzz", "force"], default="dir", help="""
                         Dir mode: perform directory enumeration (Default)
                         Vhost mode: perform vhost enumeration by setting the Host header with the wordlist content
                         Fuzzing mode: perform fuzzing on headers value, cookies value, [GET|POST|PUT|DELETE] parameters
                         Force mode: same as fuzz mode except it requires the --error field to confirm the success of the attack
-                        \n The word FUZZ needs to be included. You can include FUZZ inside multiple fields. \
-                        You can choose to put the FUZZ keyword inside the url. \
+                        \n The word FUZZ needs to be included. You can include FUZZ inside multiple fields.
+                        You can choose to put the FUZZ keyword inside the url.
                         Example:
-                            python3 WebEnum.py http://localhost/login --mode fuzz --method POST --params \"login=admin&password=FUZZ\" \
-                            or '{\"login\":\"admin\",\"password\":\"FUZZ\"}' \
+                            python3 WebEnum.py http://localhost/login --mode fuzz --method POST --params \"login=admin&password=FUZZ\"
+                            or '{\"login\":\"admin\",\"password\":\"FUZZ\"}'
                             python3 WebEnum.py http://localhost/import?file=FUZZ --mode fuzz
                             python3 WebEnum.py http://localhost/login --mode force -H {\"session\":\"FUZZ\"} --error "Incorrect session"
                             python3 WebEnum.py http://localhost/ --mode vhost -w SecLists-master/Discovery/DNS/subdomains-top1million-110000.txt

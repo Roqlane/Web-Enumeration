@@ -32,6 +32,8 @@ class LoadSettings:
         return lst # contains the path of all wordlists
 
     def getFileData(self, path):
+        if path == "":
+            return []
         data = []
         try:
             with open(path, "r") as f:

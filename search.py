@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 
 class Search:
-    def __init__(self, url, method, cookies, headers, extensions, status_code,
+    def __init__(self, url, method, cookies, headers, extensions, status_codes,
                  timeout, time_interval, max_concurrency, mode, params, 
                  error_response, hidden_status_codes, hidden_filesizes):
         self.mode = mode
@@ -17,7 +17,7 @@ class Search:
         self.method = method
         self.cookies = cookies
         self.headers = headers
-        self.status_code = status_code
+        self.status_codes = status_codes
         self.extensions = extensions
         self.timeout = timeout
         self.time_interval = time_interval
@@ -29,10 +29,30 @@ class Search:
         self.hidden_filesizes = hidden_filesizes
         
     def __str__(self):
-        #TODO
-        #I want to display the search object
-        #By showing the main arguments
-        pass
+        #Display the search object by showing the  arguments
+        output = ""
+        output += f"{self.mode.upper()} mode using {self.method} method on {self.url}\n"
+        output += f"Extensions: {', '.join(self.extensions)}\n"
+        output += "Headers:\n"
+        for k,v in self.headers.items():
+            output += f"\t{k}: {v}\n"
+        output += "Cookies:\n"
+        for k,v in self.cookies.items():
+            output += f"\t{k}: {v}\n"
+        if self.params != None:
+            output += "Parameters:\n"
+            for k,v in self.params.items():
+                output += f"\t{k}: {v}\n"
+        if self.error_response != None:
+            output += f"Error response: {self.error_response}\n"
+        output += f"Showing status codes: {', '.join(self.status_codes)}\n"
+        output += f"Hidding status codes: {', '.join(self.hidden_status_codes)}\n"
+        output += f"Hidding file sizes {', '.join(self.hidden_filesizes)}\n"
+        output += f"Timeout: {self.timeout}s\n"
+        output += f"Time interval: {self.time_interval}s\n"
+        output += f"Max concurrency: {self.max_concurrency}\n"
+        
+        return output
         
     def create_ssl_context(self):
             # For ctf, the certificate may not be valid. This ignore this case.
@@ -68,20 +88,20 @@ class Search:
         status = str(resp.status)
         text = await resp.text()
         
-        valid_status = status in self.status_code and status not in self.hidden_status_codes
+        valid_status = status in self.status_codes and status not in self.hidden_status_codes
         valid_size = content_length not in self.hidden_filesizes
         endpoint_not_found = endpoint not in results_found
         
         if valid_status and valid_size and endpoint_not_found:
             results_found.append(endpoint)
             if self.mode == "vhost":
-                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint}.{self.host} (Code : {resp.status}){END}")
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint}.{self.host} (Code : {resp.status}; Size: {content_length}){END}")
             elif self.mode == "fuzz":
-                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}){END}")
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}; Size: {content_length}){END}")
             elif self.mode == "force" and self.error_response not in text:
-                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}){END}")
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {endpoint} (Code : {resp.status}; Size: {content_length}){END}")
             else:
-                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url} (Code : {resp.status}){END}")
+                print(f"{getColor(resp.status)}[+] {currentIndex} Found : {complete_url} (Code : {resp.status}; Size: {content_length}){END}")
                 
     async def request_url(self, session, semaphore, timeout, endpoint, currentIndex, results_found):
         """Send the request"""       
@@ -90,7 +110,7 @@ class Search:
         params = self.params
         #vhost mode
         if self.mode == "vhost":
-            cookies["Host"] = endpoint + "." + self.host
+            headers["Host"] = endpoint + "." + self.host
         #fuzz or force mode
         elif self.mode == "fuzz" or self.mode == "force":
             if self.are_params_json():

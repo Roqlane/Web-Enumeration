@@ -2,3 +2,4 @@ test/
 TODO
 __pycache__/
 .vscode/
+config.json
