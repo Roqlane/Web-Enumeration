@@ -108,6 +108,7 @@ class Search:
         headers = self.headers
         cookies = self.cookies
         params = self.params
+        complete_url = self.url
         #vhost mode
         if self.mode == "vhost":
             headers["Host"] = endpoint + "." + self.host
