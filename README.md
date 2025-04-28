@@ -77,7 +77,7 @@ There is a fuzzing mode to perform further enumeration. It is needed to put the 
 
 ### Examples
 
-`python3 WebEnum.py http://localhost:5000/?params=FUZZ --mode fuzz'` 
+`python3 WebEnum.py http://localhost:5000/?params=FUZZ --mode fuzz` 
 
 
 `python3 WebEnum.py http://localhost:5000/admin --mode fuzz --cookies '{"field":"FUZZ"}'` 
